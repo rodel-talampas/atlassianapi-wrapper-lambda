@@ -1,0 +1,86 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: atlassianapi # NOTE: update this with your service name
+
+custom:
+  stage: ${opt:stage}
+  bucket: ${file(./env.yml):${self:custom.stage}.bucket}
+  region: ${file(./env.yml):${self:custom.stage}.region}
+  profile: ${file(./env.yml):${self:custom.stage}.profile}
+  suffix: ${self:service}-${self:custom.stage}
+  prefix: ${self:custom.stage}-${self:service}
+  process: process-${self:custom.suffix}
+
+provider:
+  name: aws
+  runtime: python3.6
+  environment: ${file(./env.yml):${self:custom.stage}}
+  stage: ${self:custom.stage}
+  region: ${self:custom.region}
+  profile: ${self:custom.profile}
+  deploymentBucket: ${self:custom.bucket}
+
+  iamRoleStatements:
+    # provide access permission to existing deployment bucket
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:ListBucket
+        - s3:GetObject
+      Resource: arn:aws:s3:::${self:custom.bucket}/*
+    - Effect: Allow
+      Action:
+        - apigateway:*
+      Resource: arn:aws:apigateway:*::/*
+    - Effect: Allow
+      Action:
+        - cloudfront:*
+      Resource:
+        - "*"
+    - Effect: Allow
+      Action:
+        - acm:*
+      Resource:
+        - "*"
+    - Effect: Allow
+      Action:
+        - ssm:*
+      Resource:
+        - "*"
+    # provide access to Cloudsearch
+    - Effect: Allow
+      Action:
+        - cloudsearch:*
+      Resource:
+        - "*"
+
+package:
+  exclude:
+    - .env
+    - .gitignore
+    - __pycache__/**
+    - dev/** # virtual env
+    - node_modules/**
+    - Pipfile*
+    - package*
+
+functions:
+  get-atco:
+    name: ${self:custom.process}-get
+    handler: handler.atco
+    events:
+      - http:
+          path: jira/getATCO
+          method: get
+          cors: true
