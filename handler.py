@@ -4,6 +4,8 @@ import os
 from botocore.vendored import requests
 from base64 import b64encode
 import decimalencoder
+import datetime
+from itertools import groupby
 
 client = boto3.client('ssm')
 
@@ -71,6 +73,64 @@ def atco(event, context):
         },
         "statusCode": statusCode,
         "body": json.dumps(jiraResponse, cls=decimalencoder.DecimalEncoder)
+    }
+
+	return response
+
+def contractNotices(event, context):
+	statusCode = 200
+
+	headers = {
+        'content-type': 'application/json'
+    }
+	starttime = datetime.datetime.now().strftime("%Y-01-01T00:00:00Z")
+	currenttime = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+	response = requests.get(os.environ['cnapibase']+starttime+"/"+currenttime,headers=headers)
+	jsonResponse = json.loads(response.content.decode('utf8'))
+
+	cnResponse = []
+	found = True
+
+	while found:
+		for release in jsonResponse['releases']:
+			contract = []
+			contract.append(release['date'][0:7])
+			contract.append(release['contracts'][0]['id'])
+			cnResponse.append(contract)
+
+		found = jsonResponse.get('links') != None and jsonResponse['links'].get('next') != None
+		if found:
+			nexturl = jsonResponse['links']['next']
+			response = requests.get(nexturl,headers=headers)
+			jsonResponse = json.loads(response.content.decode('utf8'))
+
+	groups = []
+	uniquekeys = []
+
+	def datekey(val):
+		return val[0]
+
+	cnResponse = sorted(cnResponse,key=datekey)
+	for k, g in groupby(cnResponse, key=datekey):
+		groups.append(len(list(g)))
+		uniquekeys.append(k)
+
+	print(groups)
+	print(uniquekeys)
+
+	apiResponse = {}
+	apiResponse['key']=uniquekeys
+	apiResponse['count']=groups
+
+	response = {
+        "headers": {
+            "Access-Control-Allow-Origin" : "*", # Required for CORS support to work
+            "Access-Control-Allow-Credentials" : True, # Required for cookies, authorization headers with HTTPS
+            "Cache-Control" : "public, max-age=60"
+        },
+        "statusCode": statusCode,
+        "body": json.dumps(apiResponse, cls=decimalencoder.DecimalEncoder)
     }
 
 	return response

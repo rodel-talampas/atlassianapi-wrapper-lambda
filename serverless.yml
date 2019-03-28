@@ -30,7 +30,9 @@ provider:
   region: ${self:custom.region}
   profile: ${self:custom.profile}
   deploymentBucket: ${self:custom.bucket}
-
+  timeout: 900
+  memorySize: 2048
+  
   iamRoleStatements:
     # provide access permission to existing deployment bucket
     - Effect: Allow
@@ -77,10 +79,18 @@ package:
 
 functions:
   get-atco:
-    name: ${self:custom.process}-get
+    name: ${self:custom.suffix}-jira
     handler: handler.atco
     events:
       - http:
-          path: jira/getATCO
+          path: getATCO
+          method: get
+          cors: true
+  get-cns:
+    name: ${self:custom.suffix}-tendercn
+    handler: handler.contractNotices
+    events:
+      - http:
+          path: getCNCountsByMonth
           method: get
           cors: true
